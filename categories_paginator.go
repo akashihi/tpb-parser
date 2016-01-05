@@ -22,21 +22,37 @@ func (p *Paginator) queue(page string) {
 }
 
 func (p *Paginator) run() {
-	for categoryUrl := range p.categoryPages {
-		var url bytes.Buffer
-		url.WriteString(p.topUrl)
-		url.WriteString(categoryUrl)
-
-		log.Info("Parsing paginator at: %s", url.String())
-		doc, err := goquery.NewDocument(url.String())
-
-		if err != nil {
-			log.Critical("Can't download category page from TPB: %v", err)
-			continue
+	w := <-p.categoryPages
+	p.categoryPages <- w
+	for {
+		select {
+		case page, ok := <-p.categoryPages:
+			if !ok {
+				log.Warning("Paginator channel closed")
+				return
+			}
+			p.processPaginator(page)
+		default:
+			log.Info("All category pages pagination processed")
+			close(p.categoryPages)
 		}
-
-		doc.Find("td[colspan=\"9\"]").Each(func(i int, s *goquery.Selection) {
-			log.Info("Found pginator")
-		})
 	}
+}
+
+func (p *Paginator) processPaginator(page string) {
+	var url bytes.Buffer
+	url.WriteString(p.topUrl)
+	url.WriteString(page)
+
+	log.Info("Parsing paginator at: %s", url.String())
+	doc, err := goquery.NewDocument(url.String())
+
+	if err != nil {
+		log.Critical("Can't download category page from TPB: %v", err)
+		return
+	}
+
+	doc.Find("td[colspan=\"9\"]").Each(func(i int, s *goquery.Selection) {
+		log.Info("Found paginator")
+	})
 }
