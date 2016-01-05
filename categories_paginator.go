@@ -52,7 +52,14 @@ func (p *Paginator) processPaginator(page string) {
 		return
 	}
 
-	doc.Find("td[colspan=\"9\"]").Each(func(i int, s *goquery.Selection) {
-		log.Info("Found paginator")
-	})
+	if doc.Is("#main-content p.info") {
+		log.Info("Empty page, finishing paginator processing")
+		return
+	}
+
+	u, pU := doc.Find("img[alt=\"Next\"]").Parent().Attr("href")
+	if pU {
+		log.Info("Found next page at %s", u)
+		p.queue(u)
+	}
 }
