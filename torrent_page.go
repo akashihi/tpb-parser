@@ -6,11 +6,12 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
 const (
-	streams = 1
+	streams = 16
 )
 
 type TorrentEntry struct {
@@ -22,30 +23,40 @@ type TorrentEntry struct {
 	by          string
 	hash        string
 	uploaded    time.Time
+	magnet      string
+	info        string
 }
 
 type Downloader struct {
 	topUrl    string
 	initialId int
 	pageId    chan int
+	wg        sync.WaitGroup
+	output    OutputModule
 }
 
-func newDownloader(tU string, id int) *Downloader {
+func newDownloader(o OutputModule, tU string, id int) *Downloader {
 	return &Downloader{
 		topUrl:    tU,
 		initialId: id,
-		pageId:    make(chan int),
+		pageId:    make(chan int, 1024),
+		wg:        sync.WaitGroup{},
+		output:    o,
 	}
 }
 
 func (d *Downloader) run() {
+	d.wg.Add(streams)
 	for w := 0; w <= streams; w++ {
 		go d.processPage()
 	}
-	for w := d.initialId; w >= 0; w-- {
+	for w := d.initialId; w >= d.initialId-1000; w-- {
 		d.pageId <- w
 	}
 	close(d.pageId)
+	log.Info("Processing complete, waiting for goroutines to finish")
+	d.wg.Wait()
+	d.output.Done()
 }
 
 func (d *Downloader) processPage() {
@@ -60,31 +71,29 @@ func (d *Downloader) processPage() {
 
 		if err != nil {
 			log.Warning("Can't download torrent page %s from TPB: %v", url, err)
-			return
+			continue
 		}
 
 		torrentData := doc.Find("#detailsframe")
+		if torrentData.Length() < 1 {
+			log.Warning("Erroneous torrent %d: \"%s\"", id, url.String())
+			continue
+		}
 
 		torrent := TorrentEntry{}
 		torrent.processTitle(torrentData)
 		torrent.processFirstColumn(torrentData)
 		torrent.processSecondColumn(torrentData)
 		torrent.processHash(torrentData)
+		torrent.processMagnet(torrentData)
+		torrent.processInfo(torrentData)
 
-		log.Info("Torrent title is: %s", torrent.title)
+		d.output.Put(&torrent)
+
+		log.Info("Processed torrent %d: \"%s\"", id, torrent.title)
+
 	}
-
-	/*if doc.Is("#main-content p.info") {
-		log.Info("Empty page, finishing paginator processing")
-		return
-	}
-
-	u, pU := doc.Find("img[alt=\"Next\"]").Parent().Attr("href")
-	if pU {
-		log.Info("Found next page at %s", u)
-		p.queue(u)
-	}*/
-
+	d.wg.Done()
 }
 
 func (t *TorrentEntry) processTitle(torrentData *goquery.Selection) {
@@ -154,15 +163,18 @@ func (t *TorrentEntry) processSecondColumn(torrentData *goquery.Selection) {
 }
 
 func (t *TorrentEntry) processHash(torrentData *goquery.Selection) {
-	data := torrentData.Find("#details .col2 dt")
-	if data.Size() < 2 {
-		log.Warning("Not enough data to parse in second coumnt")
+	t.hash = strings.TrimSpace(torrentData.Find("#details .col2").Contents().Last().Text())
+}
+
+func (t *TorrentEntry) processMagnet(torrentData *goquery.Selection) {
+	u, pU := torrentData.Find(".download a").First().Attr("href")
+	if pU {
+		t.magnet = strings.TrimSpace(u)
+	} else {
+		t.magnet = ""
 	}
+}
 
-	//Uploaded
-	uploadedData := data.First().Next().Text()
-	t.uploaded, _ = time.Parse("2006-01-02 15:04:05 MST", uploadedData)
-
-	//By
-	t.by = strings.TrimSpace(data.Eq(1).Next().Find("a").Text())
+func (t *TorrentEntry) processInfo(torrentData *goquery.Selection) {
+	t.info, _ = torrentData.Find(".nfo pre").Html()
 }

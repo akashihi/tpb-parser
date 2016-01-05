@@ -10,11 +10,15 @@ func main() {
 
 	log.Info("We will look for TPB at https://thepiratebay.cr")
 
-	d := newDownloader(tpbUrl, getRecentId(tpbUrl))
+	configuration := config()
+
+	var outputModule OutputModule
+	if configuration.csv {
+		csv := newCsvOutputModule(configuration.output)
+		outputModule = csv
+		go csv.run()
+	}
+
+	d := newDownloader(outputModule, tpbUrl, getRecentId(tpbUrl))
 	d.run()
-	/*p := newPaginator(tpbUrl)
-
-	getTopCategories(tpbUrl, p)
-
-	p.run()*/
 }
