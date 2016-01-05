@@ -39,18 +39,19 @@ func (o *CsvOutputModule) Put(t *TorrentEntry) {
 	o.entries <- t
 }
 
-func (o *CsvOutputModule) run() {
+func (o *CsvOutputModule) Run() {
 	for entry := range o.entries {
 		record := []string{
-			entry.title,
-			strconv.Itoa(entry.size),
-			strconv.Itoa(entry.files),
-			entry.category,
-			entry.subcategory,
-			entry.by,
-			entry.hash,
-			entry.uploaded.Format(time.RFC822),
-			entry.magnet,
+			strconv.Itoa(entry.Id),
+			entry.Title,
+			strconv.Itoa(entry.Size),
+			strconv.Itoa(entry.Files),
+			entry.Category,
+			entry.Subcategory,
+			entry.By,
+			entry.Hash,
+			entry.Uploaded.Format(time.RFC822),
+			entry.Magnet,
 		}
 		o.writer.Write(record)
 	}

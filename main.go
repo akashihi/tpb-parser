@@ -13,11 +13,12 @@ func main() {
 	configuration := config()
 
 	var outputModule OutputModule
-	if configuration.csv {
-		csv := newCsvOutputModule(configuration.output)
-		outputModule = csv
-		go csv.run()
+	if configuration.json {
+		outputModule = newJsonOutputModule(configuration.output)
+	} else if configuration.csv {
+		outputModule = newCsvOutputModule(configuration.output)
 	}
+	go outputModule.Run()
 
 	d := newDownloader(outputModule, tpbUrl, getRecentId(tpbUrl))
 	d.run()

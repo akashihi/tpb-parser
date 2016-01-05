@@ -15,16 +15,17 @@ const (
 )
 
 type TorrentEntry struct {
-	title       string
-	size        int
-	files       int
-	category    string
-	subcategory string
-	by          string
-	hash        string
-	uploaded    time.Time
-	magnet      string
-	info        string
+	Id          int
+	Title       string
+	Size        int
+	Files       int
+	Category    string
+	Subcategory string
+	By          string
+	Hash        string
+	Uploaded    time.Time
+	Magnet      string
+	Info        string
 }
 
 type Downloader struct {
@@ -80,7 +81,7 @@ func (d *Downloader) processPage() {
 			continue
 		}
 
-		torrent := TorrentEntry{}
+		torrent := TorrentEntry{Id: id}
 		torrent.processTitle(torrentData)
 		torrent.processFirstColumn(torrentData)
 		torrent.processSecondColumn(torrentData)
@@ -90,15 +91,14 @@ func (d *Downloader) processPage() {
 
 		d.output.Put(&torrent)
 
-		log.Info("Processed torrent %d: \"%s\"", id, torrent.title)
+		log.Info("Processed torrent %d: \"%s\"", id, torrent.Title)
 
 	}
 	d.wg.Done()
 }
 
 func (t *TorrentEntry) processTitle(torrentData *goquery.Selection) {
-	t.title, _ = torrentData.Find("#title").Html()
-	t.title = strings.TrimSpace(t.title)
+	t.Title = strings.TrimSpace(torrentData.Find("#title").Text())
 }
 
 func (t *TorrentEntry) processFirstColumn(torrentData *goquery.Selection) {
@@ -113,11 +113,11 @@ func (t *TorrentEntry) processFirstColumn(torrentData *goquery.Selection) {
 	categories := strings.Split(categoryData, ">")
 	if len(categories) < 2 {
 		log.Warning("Can't retrieve category and sub category of torrent")
-		t.category = "Unknown"
-		t.subcategory = "Unknown"
+		t.Category = "Unknown"
+		t.Subcategory = "Unknown"
 	} else {
-		t.category = strings.TrimSpace(categories[0])
-		t.subcategory = strings.TrimSpace(categories[1])
+		t.Category = strings.TrimSpace(categories[0])
+		t.Subcategory = strings.TrimSpace(categories[1])
 	}
 
 	//Files
@@ -125,9 +125,9 @@ func (t *TorrentEntry) processFirstColumn(torrentData *goquery.Selection) {
 	files, err := strconv.Atoi(filesData)
 	if err != nil {
 		log.Warning("Can't retrieve number of files in torrent")
-		t.files = -1
+		t.Files = -1
 	} else {
-		t.files = files
+		t.Files = files
 	}
 
 	//Size
@@ -138,13 +138,13 @@ func (t *TorrentEntry) processFirstColumn(torrentData *goquery.Selection) {
 		size, err := strconv.Atoi(rx.FindStringSubmatch(sizeData)[1])
 		if err != nil {
 			log.Warning("Can't retrieve size of files in the torrent")
-			t.size = -1
+			t.Size = -1
 		} else {
-			t.size = size
+			t.Size = size
 		}
 	} else {
 		log.Warning("Can't parse size of files in the torrent")
-		t.size = -1
+		t.Size = -1
 	}
 }
 
@@ -156,25 +156,25 @@ func (t *TorrentEntry) processSecondColumn(torrentData *goquery.Selection) {
 
 	//Uploaded
 	uploadedData := data.First().Next().Text()
-	t.uploaded, _ = time.Parse("2006-01-02 15:04:05 MST", uploadedData)
+	t.Uploaded, _ = time.Parse("2006-01-02 15:04:05 MST", uploadedData)
 
 	//By
-	t.by = strings.TrimSpace(data.Eq(1).Next().Find("a").Text())
+	t.By = strings.TrimSpace(data.Eq(1).Next().Find("a").Text())
 }
 
 func (t *TorrentEntry) processHash(torrentData *goquery.Selection) {
-	t.hash = strings.TrimSpace(torrentData.Find("#details .col2").Contents().Last().Text())
+	t.Hash = strings.TrimSpace(torrentData.Find("#details .col2").Contents().Last().Text())
 }
 
 func (t *TorrentEntry) processMagnet(torrentData *goquery.Selection) {
 	u, pU := torrentData.Find(".download a").First().Attr("href")
 	if pU {
-		t.magnet = strings.TrimSpace(u)
+		t.Magnet = strings.TrimSpace(u)
 	} else {
-		t.magnet = ""
+		t.Magnet = ""
 	}
 }
 
 func (t *TorrentEntry) processInfo(torrentData *goquery.Selection) {
-	t.info, _ = torrentData.Find(".nfo pre").Html()
+	t.Info, _ = torrentData.Find(".nfo pre").Html()
 }
