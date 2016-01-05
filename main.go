@@ -10,7 +10,8 @@ func main() {
 
 	log.Info("We will look for TPB at https://thepiratebay.cr")
 
-	getRecentId(tpbUrl)
+	d := newDownloader(tpbUrl, getRecentId(tpbUrl))
+	d.run()
 	/*p := newPaginator(tpbUrl)
 
 	getTopCategories(tpbUrl, p)
