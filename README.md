@@ -4,6 +4,8 @@
 
 thepiratebay.cr database downloader. Parses The Pirate Bay site and stores it's data into csv or json files.
 
+Written as a exercise in Go, so do not expect too much.
+
 ## Building it
 
 1. Install [go](http://golang.org/doc/install)
